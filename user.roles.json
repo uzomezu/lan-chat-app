@@ -1,0 +1,17 @@
+{
+    "isAdmin" : {
+        "privilidges" : [
+            "get any user",
+            "edit any user",
+            "delete any user",
+            "get my profile",
+            "edit my profile"
+        ]
+    },
+    "user" : {
+        "privilidges" : [
+            "get my profile",
+            "edit my profile"
+        ]
+    }
+}
