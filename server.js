@@ -25,22 +25,38 @@ mongoose.connect(process.env.MONGO_URI,
     }
 })
 
+    let clients = []; // clients entering the chat
+    let messages = []; // chat messages
 
 var server = http.createServer(async function(req,res){
     
     const application_json = {
         "Content-Type" : "application/json", 
         "Connection" : "keep-alive",
-        'Cache-Control': 'no-cache'};
+        'Cache-Control': 'no-cache',
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Max-Age": 2592000, // 30 days
+    };
     const text_html = {
         "Content-Type" : "text/html",
         "Connection" : "keep-alive",
-        'Cache-Control': 'no-cache'};
-
-    let clients = []; // clients entering the chat
-    let messages = []; // chat messages
+        'Cache-Control': 'no-cache',
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Max-Age": 2592000, // 30 days
+    };
+    const event_stream = {
+            'Content-Type': 'text/event-stream',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Max-Age": 2592000, // 30 days
+          };
+    
     if (req.url == "/register" && req.method == "POST") {
-        req.body = await requestBody(req,res);
+        req.body = await requestBody(req,res); // Grab the body as JSON
         console.log(req.headers);
         if (req.body.email && req.body.pass) {
             var errors = validator({
@@ -81,7 +97,7 @@ var server = http.createServer(async function(req,res){
         }
 
     } else if (req.url == "/login" && req.method == "POST") {
-        req.body = await requestBody(req,res);
+        req.body = await requestBody(req,res); // Grab the body as JSON
         if (req.body.email && req.body.pass) {
             var errors = validator({
                 email : req.body.email,
@@ -112,7 +128,7 @@ var server = http.createServer(async function(req,res){
         }
         
     } else if (req.url == "/logout") {
-        req.body = await requestBody(req,res);
+        
         console.log(req);
 
     } else if (req.url == "/me") {
@@ -132,16 +148,48 @@ var server = http.createServer(async function(req,res){
        } else if (req.method == "DELETE") {
 
        }
-     } else if (req.url == '/events') {
-
-    } else if (req.url == '/message' && req.method == "POST"){
-
-    }
-    else if (req.url == "/") {
-
+    } else if (req.url == '/chat') {
         
+            // Good request
+            res.writeHead(200, event_stream);
+            // Grab messages
+            let data = `data: ${JSON.stringify(messages)}\n\n`;
+            //send data 
+            res.write(data);
+            const clientId = new Date();
+            const newClient = { 
+                id : clientId,
+                res
+            };
+            clients.push(newClient);
+            req.on('end', () => {
+                console.log(`${clientId} has closed their connection.`)
+                clients = clients.filter((client)=>client.id !== clientId)
+            })
+            res.end();
+            
+    } else if (req.url == '/message' && req.method == "POST"){
+        req.body = await requestBody(req,res); // Grab the body as JSON
+        const message = req.body; //grab req body of user request
+        const sendEventToAll = (newMessage) => {
+            return clients.forEach(client => {
+                client.res.end((`data: ${JSON.stringify(newMessage)}\n\n`))
+            });
+        }
+        console.log(message);
+        messages.push(message);
+        res.writeHead(201, application_json);
+        res.end(JSON.stringify(message));
+        return sendEventToAll(message);
+        
+    } else if (req.url == '/random') {
+        res.writeHead(200, application_json);
+        res.write(JSON.stringify({"message" : "random data"}));
+        res.end();
+    } else if (req.url == "/") {
         res.writeHead(200, text_html);
-        res.write(`<h1>Hello World!</h1>`)
+        console.log(req.socket.localAddress);
+        res.write(fs.readFileSync('./index.html', 'utf8').toString());
         res.end();
     } else {
         res.writeHead(500, application_json);
